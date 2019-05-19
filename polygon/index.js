@@ -1,36 +1,44 @@
 /*
  * TODO
- * * 頂点を追加する操作中に右クリックするとundoされるようにする
  * * 頂点座標の移動を行えるようにする
  * * 多角形を移動できるようにする
+ * * 既存のpolygon内をクリックしたときに座標がズレる
+ *   -> 座標の計算方法に問題がある
  */
 let inEditing = false;
 let polygon = null;
 let svg = document.querySelector("svg");
+
 svg.addEventListener("dblclick", (ev) => {
-    console.log("dblclick");
     let {x, y} = getRelativeCoordinate(ev);
-    console.log(x, y);
     startPolygon(x, y);
     svg.appendChild(polygon);
 });
 svg.addEventListener("click", (ev) => {
-    console.log("click");
     let {x, y} = getRelativeCoordinate(ev);
-    appendPointToPolygon(polygon, x, y);
+    addPoint(polygon, x, y);
+});
+svg.addEventListener("contextmenu", (ev) => {
+    ev.preventDefault();
+});
+svg.addEventListener("mousedown", (ev) => {
+    if (ev.button != 2) {
+        return;
+    }
+    removeLastAddedPoint(polygon);
 });
 document.addEventListener("keydown", (ev) => {
-    console.log("keydown");
     if (ev.keyCode !== 27) {
         return;
     }
-    console.log("esc");
     endPolygon(polygon);
 });
 
 function getRelativeCoordinate(ev) {
     let rect = ev.target.getBoundingClientRect();
     // NOTE SVGの大きさをviewBoxで指定した場合に、下記ではSVG内に収まるような座標に調整できていない
+    // TODO 座標の計算方法の修正
+    //      SVG内での相対座標を求めたい
     let x = ev.layerX - rect.x,
         y = ev.layerY - rect.y;
 
@@ -56,7 +64,7 @@ function startPolygon(x, y) {
     polygon = p;
 }
 
-function appendPointToPolygon(polygon, x, y) {
+function addPoint(polygon, x, y) {
     if (!inEditing) {
         return;
     }
@@ -65,10 +73,36 @@ function appendPointToPolygon(polygon, x, y) {
     polygon.setAttribute("points", points + " " + x + "," + y);
 }
 
+function getPoints(polygon) {
+    return polygon.getAttribute("points").split(" ");
+}
+
+function removeLastAddedPoint(polygon) {
+    if (!inEditing) {
+        return;
+    }
+
+    let points = getPoints(polygon);
+    polygon.setAttribute("points", points.slice(0, points.length - 1).join(" "));
+
+    if (points.length < 2) {
+        endEditing();
+        return;
+    }
+}
+
 function endPolygon(polygon) {
     if (!inEditing) {
         return;
     }
+    // remove the polygon when the one with less than 3 vertices
+    if (getPoints(polygon).length < 3) {
+        polygon.parentNode.removeChild(polygon);
+    }
+    endEditing();
+}
+
+function endEditing() {
     polygon = null;
     inEditing = false;
 }
